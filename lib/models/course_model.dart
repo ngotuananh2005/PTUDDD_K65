@@ -50,7 +50,7 @@ class CourseModel {
       'name': name,
       'code': code,
       'description': description,
-      'colorValue': color.value,
+      'colorValue': color.toARGB32(),
       'iconCodePoint': icon.codePoint,
       'orderIndex': order,
       'dateCreated': dateCreated.toIso8601String(),
@@ -64,7 +64,8 @@ class CourseModel {
       code: map['code'] as String,
       description: (map['description'] as String?) ?? '',
       color: Color((map['colorValue'] as int?) ?? 0xFF1976D2),
-      icon: IconData((map['iconCodePoint'] as int?) ?? Icons.school.codePoint, fontFamily: 'MaterialIcons'),
+      // ignore: non_const_argument_for_const_parameter
+      icon: IconData((map['iconCodePoint'] as int?) ?? 0xe559, fontFamily: 'MaterialIcons'),
       order: (map['orderIndex'] as int?) ?? 0,
       dateCreated: DateTime.parse(map['dateCreated'] as String),
     );

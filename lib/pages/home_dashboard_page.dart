@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../state/auth_provider.dart';
 import '../state/document_provider.dart';
 import '../state/theme_provider.dart';
 import '../widgets/confirmation_dialog.dart';
 import '../widgets/course_chip.dart';
 import '../widgets/document_card.dart';
 import '../widgets/progress_gauge.dart';
+import '../widgets/user_profile_dialog.dart';
 import 'add_edit_document_page.dart';
 import 'document_detail_page.dart';
 
@@ -20,6 +22,7 @@ class HomeDashboardPage extends StatelessWidget {
     final theme = Theme.of(context);
     final provider = context.watch<DocumentProvider>();
     final themeProvider = context.watch<ThemeProvider>();
+    final auth = context.watch<AuthProvider>();
 
     final stats = provider.overviewStats;
     final pinnedDocs = provider.pinnedDocuments;
@@ -39,12 +42,23 @@ class HomeDashboardPage extends StatelessWidget {
               child: Icon(Icons.school_rounded, color: theme.colorScheme.primary, size: 20),
             ),
             const SizedBox(width: 10),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Cashew StudyDocs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text('Quản lý Tài liệu Học tập', style: TextStyle(fontSize: 11, color: Colors.grey)),
-              ],
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Cashew StudyDocs',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Quản lý Tài liệu Học tập',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -56,6 +70,28 @@ class HomeDashboardPage extends StatelessWidget {
             ),
             tooltip: themeProvider.isDarkMode ? 'Chuyển sang chế độ Sáng' : 'Chuyển sang chế độ Tối',
             onPressed: () => themeProvider.toggleTheme(!themeProvider.isDarkMode),
+          ),
+          // User Profile / Google Sign-In Action
+          IconButton(
+            tooltip: auth.isAuthenticated ? 'Tài khoản: ${auth.displayName}' : 'Đăng nhập Google',
+            icon: auth.isAuthenticated
+                ? CircleAvatar(
+                    radius: 14,
+                    backgroundColor: theme.colorScheme.primaryContainer,
+                    backgroundImage: auth.photoUrl != null ? NetworkImage(auth.photoUrl!) : null,
+                    child: auth.photoUrl == null
+                        ? Text(
+                            auth.displayName.isNotEmpty ? auth.displayName[0].toUpperCase() : 'U',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.primary,
+                            ),
+                          )
+                        : null,
+                  )
+                : const Icon(Icons.account_circle_outlined),
+            onPressed: () => UserProfileDialog.show(context),
           ),
           // Reset Database popup
           IconButton(
@@ -97,6 +133,114 @@ class HomeDashboardPage extends StatelessWidget {
           : ListView(
               padding: const EdgeInsets.only(bottom: 80),
               children: [
+                // Banner Đăng nhập Google / Trạng thái tài khoản
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                  child: auth.isAuthenticated
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withAlpha(20),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.green.withAlpha(60)),
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: theme.colorScheme.primaryContainer,
+                                backgroundImage: auth.photoUrl != null ? NetworkImage(auth.photoUrl!) : null,
+                                child: auth.photoUrl == null
+                                    ? Text(
+                                        auth.displayName.isNotEmpty ? auth.displayName[0].toUpperCase() : 'U',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Xin chào, ${auth.displayName}!',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    ),
+                                    Text(
+                                      'Đã kết nối Firebase Google Cloud',
+                                      style: TextStyle(fontSize: 11, color: Colors.green.shade800),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => UserProfileDialog.show(context),
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                ),
+                                child: const Text('Hồ sơ'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Material(
+                          color: theme.colorScheme.primaryContainer.withAlpha(45),
+                          borderRadius: BorderRadius.circular(14),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () => UserProfileDialog.show(context),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withAlpha(25),
+                                          blurRadius: 4,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(Icons.login_rounded, color: Color(0xFF4285F4), size: 18),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Đăng nhập với Google',
+                                          style: theme.textTheme.titleSmall?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Đồng bộ tài liệu và bảo vệ dữ liệu học tập',
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(Icons.arrow_forward_ios_rounded, size: 13, color: theme.colorScheme.primary),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+
                 // 1. Thẻ tiến độ tổng quan (Gauge)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -155,9 +299,11 @@ class HomeDashboardPage extends StatelessWidget {
                       children: [
                         Icon(Icons.push_pin_rounded, size: 18, color: theme.colorScheme.primary),
                         const SizedBox(width: 6),
-                        Text(
-                          'Tài liệu quan trọng / Đã ghim (${pinnedDocs.length})',
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        Expanded(
+                          child: Text(
+                            'Tài liệu quan trọng / Đã ghim (${pinnedDocs.length})',
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ],
                     ),

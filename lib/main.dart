@@ -1,13 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'database/app_database.dart';
+import 'pages/login_page.dart';
 import 'pages/main_navigation_shell.dart';
+import 'services/supabase_service.dart';
+import 'state/auth_provider.dart';
 import 'state/document_provider.dart';
 import 'state/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Khởi tạo cơ sở dữ liệu nội bộ
   await StudyAppDatabase().init();
+
+  // Khởi tạo Firebase với cấu hình đa nền tảng
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Cảnh báo khởi tạo Firebase: $e');
+  }
+
+  // Khởi tạo kết nối Supabase Cloud
+  await SupabaseService.initialize();
+
   runApp(const StudyDocumentApp());
 }
 
@@ -19,8 +39,16 @@ class StudyDocumentApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        // DocumentProvider lắng nghe AuthProvider để load tài liệu được chia sẻ
+        ChangeNotifierProxyProvider<AuthProvider, DocumentProvider>(
           create: (_) => DocumentProvider(database: StudyAppDatabase()),
+          update: (ctx, auth, docProvider) {
+            // Khi user đăng nhập/đăng xuất → load hoặc xóa sharedDocuments
+            final uid = auth.user?.uid;
+            docProvider?.onUserChanged(uid);
+            return docProvider!;
+          },
         ),
       ],
       child: Consumer<ThemeProvider>(
@@ -55,7 +83,15 @@ class StudyDocumentApp extends StatelessWidget {
                 elevation: 0,
               ),
             ),
-            home: const MainNavigationShell(),
+            // Khi mở web/app: Hiển thị LoginPage đầu tiên nếu chưa đăng nhập
+            home: Consumer<AuthProvider>(
+              builder: (context, auth, _) {
+                if (auth.canAccessApp) {
+                  return const MainNavigationShell();
+                }
+                return const LoginPage();
+              },
+            ),
           );
         },
       ),

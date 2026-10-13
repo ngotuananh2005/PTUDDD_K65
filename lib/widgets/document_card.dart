@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/course_model.dart';
 import '../models/document_model.dart';
 import '../models/document_type.dart';
+import 'share_document_dialog.dart';
 
 /// Card hiển thị thông tin 1 tài liệu học tập
 class DocumentCardWidget extends StatelessWidget {
@@ -128,35 +129,61 @@ class DocumentCardWidget extends StatelessWidget {
                     tooltip: document.isPinned ? 'Bỏ ghim' : 'Ghim tài liệu',
                     onPressed: onTogglePin,
                   ),
-                  // Menu tùy chọn (Sửa / Xóa)
+                  // Menu tùy chọn (Chia sẻ / Sửa / Xóa)
                   PopupMenuButton<String>(
                     icon: Icon(Icons.more_vert_rounded,
                         color: theme.colorScheme.onSurfaceVariant, size: 20),
                     onSelected: (val) {
+                      if (val == 'share') ShareDocumentDialog.show(context, document);
                       if (val == 'edit') onEdit();
                       if (val == 'delete') onDelete();
                     },
                     itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit_outlined, size: 18),
-                            SizedBox(width: 8),
-                            Text('Chỉnh sửa'),
-                          ],
+                      if (document.isOwner)
+                        const PopupMenuItem(
+                          value: 'share',
+                          child: Row(
+                            children: [
+                              Icon(Icons.share_rounded, size: 18, color: Colors.blue),
+                              SizedBox(width: 8),
+                              Text('Chia sẻ tài liệu'),
+                            ],
+                          ),
                         ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Xóa tài liệu', style: TextStyle(color: Colors.red)),
-                          ],
+                      if (document.canEdit)
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined, size: 18),
+                              SizedBox(width: 8),
+                              Text('Chỉnh sửa'),
+                            ],
+                          ),
                         ),
-                      ),
+                      if (document.isOwner)
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Xóa tài liệu', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      if (!document.canEdit && !document.isOwner)
+                        const PopupMenuItem(
+                          enabled: false,
+                          value: 'info',
+                          child: Row(
+                            children: [
+                              Icon(Icons.visibility_rounded, size: 18, color: Colors.amber),
+                              SizedBox(width: 8),
+                              Text('Chỉ xem (Viewer)', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -193,60 +220,66 @@ class DocumentCardWidget extends StatelessWidget {
               // Hàng 3: Metadata (Thời gian đọc, Deadline, Trạng thái học)
               Row(
                 children: [
-                  // Thời lượng đọc / số trang
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.timer_outlined,
-                          size: 14, color: theme.colorScheme.onSurfaceVariant),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${document.estimatedMinutes}p',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      if (document.pageCount > 0) ...[
-                        const SizedBox(width: 8),
-                        Text(
-                          '• ${document.pageCount} trang',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-
-                  // Hạn chót nếu có
-                  if (document.dueDate != null) ...[
-                    const SizedBox(width: 10),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
+                  Expanded(
+                    child: Wrap(
+                      spacing: 10,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Icon(Icons.event_outlined,
-                            size: 14,
-                            color: document.dueDate!.isBefore(DateTime.now())
-                                ? Colors.red
-                                : theme.colorScheme.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text(
-                          DateFormat('dd/MM').format(document.dueDate!),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: document.dueDate!.isBefore(DateTime.now())
-                                ? Colors.red
-                                : theme.colorScheme.onSurfaceVariant,
-                          ),
+                        // Thời lượng đọc / số trang
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.timer_outlined,
+                                size: 14, color: theme.colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${document.estimatedMinutes}p',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            if (document.pageCount > 0) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                '• ${document.pageCount} trang',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
+
+                        // Hạn chót nếu có
+                        if (document.dueDate != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.event_outlined,
+                                  size: 14,
+                                  color: document.dueDate!.isBefore(DateTime.now())
+                                      ? Colors.red
+                                      : theme.colorScheme.onSurfaceVariant),
+                              const SizedBox(width: 4),
+                              Text(
+                                DateFormat('dd/MM').format(document.dueDate!),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: document.dueDate!.isBefore(DateTime.now())
+                                      ? Colors.red
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
-                  ],
-
-                  const Spacer(),
+                  ),
+                  const SizedBox(width: 8),
 
                   // Quick toggle status chip
                   PopupMenuButton<StudyStatus>(

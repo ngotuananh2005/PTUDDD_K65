@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../models/course_model.dart';
 import '../models/document_model.dart';
 import '../models/document_type.dart';
 import '../state/document_provider.dart';
@@ -85,6 +84,16 @@ class _AddEditDocumentPageState extends State<AddEditDocumentPage> {
   }
 
   void _saveDocument() {
+    if (widget.documentToEdit != null && !widget.documentToEdit!.canEdit) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bạn chỉ có quyền xem tài liệu này, không thể chỉnh sửa!'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     final provider = context.read<DocumentProvider>();
@@ -109,6 +118,12 @@ class _AddEditDocumentPageState extends State<AddEditDocumentPage> {
       status: _selectedStatus,
       priority: _selectedPriority,
       fileUrl: _fileUrlController.text.trim(),
+      storagePath: widget.documentToEdit?.storagePath ?? '',
+      fileName: widget.documentToEdit?.fileName ?? '',
+      fileSize: widget.documentToEdit?.fileSize ?? 0,
+      ownerId: widget.documentToEdit?.ownerId,
+      ownerEmail: widget.documentToEdit?.ownerEmail,
+      sharedPermission: widget.documentToEdit?.sharedPermission,
       pageCount: int.tryParse(_pageCountController.text.trim()) ?? 0,
       estimatedMinutes:
           int.tryParse(_estimatedMinutesController.text.trim()) ?? 30,
@@ -182,7 +197,7 @@ class _AddEditDocumentPageState extends State<AddEditDocumentPage> {
 
             // Chọn Môn học
             DropdownButtonFormField<String>(
-              value: _selectedCourseId,
+              initialValue: _selectedCourseId,
               isExpanded: true,
               decoration: InputDecoration(
                 labelText: 'Môn học *',

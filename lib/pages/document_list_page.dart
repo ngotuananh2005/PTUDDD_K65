@@ -24,10 +24,24 @@ class DocumentListPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kho Tài liệu Học tập'),
+        title: Text(provider.onlyShared ? 'Tài liệu Được Chia sẻ' : 'Kho Tài liệu Học tập'),
         actions: [
+          if (provider.onlyShared)
+            IconButton(
+              icon: provider.isLoadingCloud
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.cloud_sync_rounded),
+              tooltip: 'Tải lại tài liệu được chia sẻ',
+              onPressed: provider.isLoadingCloud
+                  ? null
+                  : () => provider.refreshSharedDocuments(),
+            ),
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(Icons.filter_alt_off_rounded),
             tooltip: 'Đặt lại bộ lọc',
             onPressed: () => provider.resetFilters(),
           ),
@@ -87,6 +101,29 @@ class DocumentListPage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
+                // Filter tài liệu Được chia sẻ
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: FilterChip(
+                    selected: provider.onlyShared,
+                    showCheckmark: false,
+                    avatar: Icon(
+                      Icons.share_rounded,
+                      size: 14,
+                      color: provider.onlyShared ? Colors.white : Colors.indigo,
+                    ),
+                    label: const Text('Được chia sẻ', style: TextStyle(fontSize: 11)),
+                    selectedColor: Colors.indigo,
+                    labelStyle: TextStyle(
+                      color: provider.onlyShared ? Colors.white : theme.colorScheme.onSurface,
+                      fontWeight: provider.onlyShared ? FontWeight.bold : FontWeight.normal,
+                    ),
+                    onSelected: (selected) {
+                      provider.setOnlyShared(selected);
+                    },
+                  ),
+                ),
+
                 // Filter theo DocumentType
                 ...DocumentType.values.map((type) {
                   final isSelected = provider.selectedType == type;

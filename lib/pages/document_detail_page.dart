@@ -5,6 +5,7 @@ import '../models/document_model.dart';
 import '../models/document_type.dart';
 import '../state/document_provider.dart';
 import '../widgets/confirmation_dialog.dart';
+import '../widgets/share_document_dialog.dart';
 import 'add_edit_document_page.dart';
 
 /// Màn hình Chi tiết Tài liệu học tập
@@ -18,21 +19,39 @@ class DocumentDetailPage extends StatelessWidget {
     final theme = Theme.of(context);
     final provider = context.watch<DocumentProvider>();
 
-    final document = provider.allDocuments.firstWhere(
-      (d) => d.id == documentId,
-      orElse: () => DocumentModel(
-        id: '',
-        title: 'Tài liệu không tồn tại',
-        courseId: '',
-        type: DocumentType.lecture,
-        dateCreated: DateTime.fromMillisecondsSinceEpoch(0),
-      ),
+    // Tìm trong local SQLite trước
+    DocumentModel? found = provider.allDocuments.cast<DocumentModel?>().firstWhere(
+      (d) => d!.id == documentId,
+      orElse: () => null,
     );
+    // Nếu không thấy local → tìm trong tài liệu được chia sẻ từ Supabase
+    found ??= provider.sharedDocuments.cast<DocumentModel?>().firstWhere(
+      (d) => d!.id == documentId,
+      orElse: () => null,
+    );
+    // Dùng biến document để không thay đổi phần còn lại của file
+    final document = found;
 
-    if (document.id.isEmpty) {
+    if (document == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Chi tiết tài liệu')),
-        body: const Center(child: Text('Tài liệu đã bị xóa hoặc không tồn tại!')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.cloud_off_rounded, size: 64, color: theme.colorScheme.outline),
+              const SizedBox(height: 12),
+              const Text('Tài liệu đã bị xóa hoặc không tồn tại!',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Quay lại'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -51,40 +70,106 @@ class DocumentDetailPage extends StatelessWidget {
             tooltip: document.isPinned ? 'Bỏ ghim' : 'Ghim tài liệu',
             onPressed: () => provider.togglePin(document.id),
           ),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Chỉnh sửa',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (ctx) => AddEditDocumentPage(documentToEdit: document),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.red),
-            tooltip: 'Xóa tài liệu',
-            onPressed: () async {
-              final confirmed = await ConfirmationDialog.show(
-                context: context,
-                title: 'Xác nhận xóa tài liệu',
-                content: 'Bạn có chắc chắn muốn xóa "${document.title}"? Thao tác này không thể hoàn tác.',
-              );
-              if (confirmed && context.mounted) {
-                await provider.deleteDocument(document.id);
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đã xóa tài liệu thành công!')),
+          // Chỉ chủ sở hữu mới có quyền Chia sẻ tài liệu
+          if (document.isOwner)
+            IconButton(
+              icon: const Icon(Icons.share_rounded),
+              tooltip: 'Chia sẻ tài liệu',
+              onPressed: () => ShareDocumentDialog.show(context, document),
+            ),
+          // Chỉ hiển thị nút Chỉnh sửa nếu có quyền (Owner hoặc Editor)
+          if (document.canEdit)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Chỉnh sửa',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (ctx) => AddEditDocumentPage(documentToEdit: document),
+                  ),
                 );
-              }
-            },
-          ),
+              },
+            ),
+          // Chỉ chủ sở hữu mới có quyền Xóa tài liệu
+          if (document.isOwner)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              tooltip: 'Xóa tài liệu',
+              onPressed: () async {
+                final confirmed = await ConfirmationDialog.show(
+                  context: context,
+                  title: 'Xác nhận xóa tài liệu',
+                  content: 'Bạn có chắc chắn muốn xóa "${document.title}"? Thao tác này không thể hoàn tác.',
+                );
+                if (confirmed && context.mounted) {
+                  await provider.deleteDocument(document.id);
+                  if (context.mounted) Navigator.of(context).pop();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Đã xóa tài liệu thành công!')),
+                    );
+                  }
+                }
+              },
+            ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Banner cảnh báo quyền truy cập nếu là tài liệu được chia sẻ
+          if (!document.isOwner)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: document.canEdit
+                    ? Colors.blue.withValues(alpha: 0.12)
+                    : Colors.amber.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: document.canEdit
+                      ? Colors.blue.withValues(alpha: 0.4)
+                      : Colors.amber.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    document.canEdit ? Icons.edit_note_rounded : Icons.visibility_rounded,
+                    color: document.canEdit ? Colors.blue.shade700 : Colors.amber.shade900,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          document.canEdit ? 'QUYỀN CHỈNH SỬA (EDITOR)' : 'CHẾ ĐỘ CHỈ XEM (VIEWER)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                            color: document.canEdit ? Colors.blue.shade900 : Colors.amber.shade900,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          document.canEdit
+                              ? 'Tài liệu từ ${document.ownerEmail ?? "người khác"}. Bạn có thể xem và chỉnh sửa nội dung.'
+                              : 'Tài liệu từ ${document.ownerEmail ?? "người khác"}. Bạn chỉ có quyền đọc, không thể chỉnh sửa hoặc xóa.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           // Banner môn học & Phân loại
           Container(
             padding: const EdgeInsets.all(16),
@@ -183,7 +268,16 @@ class DocumentDetailPage extends StatelessWidget {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4),
                           child: InkWell(
-                            onTap: () => provider.updateStatus(document.id, status),
+                            onTap: !document.canEdit
+                                ? () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Chế độ chỉ xem: Bạn không thể đổi trạng thái tài liệu này!'),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                : () => provider.updateStatus(document.id, status),
                             borderRadius: BorderRadius.circular(12),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
